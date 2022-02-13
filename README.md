@@ -9,7 +9,7 @@ Work in progress.
 * Clone the repo
 * Open in VSCode
 * Run as devcontainer
-** The Dockerfile provides PostgreSQL 14 with everything that's needed to develop C functions for PostgreSQL
+    * The Dockerfile provides PostgreSQL 14 with everything that's needed to develop C functions for PostgreSQL
 * `make`
 * `make install`
 * Run the commands in `suncalc.sql`
