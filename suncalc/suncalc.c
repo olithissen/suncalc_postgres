@@ -5,6 +5,8 @@
 #include <time.h>
 #include <string.h>
 #include "fmgr.h"
+#include "miscadmin.h"
+#include <utils/builtins.h>
 
 PG_MODULE_MAGIC;
 
@@ -16,6 +18,9 @@ PG_MODULE_MAGIC;
 #define J2000 2451545
 #define e rad * 23.4397 // obliquity of the Earth
 #define J0 0.0009
+
+#define STT_NAME_MAX 20
+#define STT_ITEMS 14
 
 typedef struct SunCoordinates
 {
@@ -53,6 +58,17 @@ typedef struct SolarTimes
     long nadir;
 } SolarTimes;
 
+typedef struct SolarTimeTuple
+{
+    char name[STT_NAME_MAX];
+    long time;
+} SolarTimeTuple;
+
+typedef struct SolarTimeTuples
+{
+    SolarTimeTuple times[STT_ITEMS];
+} SolarTimeTuples;
+
 double toJulian(long timestamp);
 long fromJulian(double j);
 double toDays(long timestamp);
@@ -72,47 +88,8 @@ double observerAngle(double height);
 double getSetJ(double h, double lw, double phi, double dec, double n, double M, double L);
 SunCoordinates sunCoords(double d);
 AzimuthAltitude getPosition(long date, double lat, double lng);
-SolarTimes getTimes(long date, double lat, double lng, double height);
+SolarTimeTuples getTimes(long date, double lat, double lng, double height);
 RiseSetTime getTimeForHorizonAngles(double angle, double JNoon, double lw, double dh, double phi, double dec, double n, double M, double L);
-
-int main(int argc, char *argv[])
-{
-    long timestamp;
-    double lat;
-    double lng;
-
-    sscanf(argv[1], "%ld", &timestamp);
-    sscanf(argv[2], "%lf", &lat);
-    sscanf(argv[3], "%lf", &lng);
-
-    printf("Calculating solar ephemerides for timestamp %ld @ %f/%f\n", timestamp, lat, lng);
-    printf("====================\n");
-
-    AzimuthAltitude x = getPosition(timestamp, lat, lng);
-    SolarTimes st = getTimes(timestamp, lat, lng, 80.0);
-
-    printf("Current position:\n");
-    printf("az: %lf, alt:%lf\n", deg * x.azimuth, deg * x.altitude);
-    printf("====================\n");
-
-    printf("Ephemerides:\n");
-    printf("sunrise: %ld\n", st.sunrise);
-    printf("sunset: %ld\n", st.sunset);
-    printf("sunriseEnd: %ld\n", st.sunriseEnd);
-    printf("sunsetEnd: %ld\n", st.sunsetStart);
-    printf("dawn: %ld\n", st.dawn);
-    printf("dusk: %ld\n", st.dusk);
-    printf("nauticalDawn: %ld\n", st.nauticalDawn);
-    printf("nauticalDusk: %ld\n", st.nauticalDusk);
-    printf("nightEnd: %ld\n", st.nightEnd);
-    printf("night: %ld\n", st.night);
-    printf("goldenHour: %ld\n", st.goldenHour);
-    printf("golendHourEnd: %ld\n", st.golendHourEnd);
-    printf("solarNoon: %ld\n", st.solarNoon);
-    printf("nadir: %ld\n", st.nadir);
-
-    return 0;
-}
 
 double toJulian(long timestamp)
 {
@@ -238,7 +215,7 @@ AzimuthAltitude getPosition(long date, double lat, double lng)
     return position;
 }
 
-SolarTimes getTimes(long date, double lat, double lng, double height)
+SolarTimeTuples getTimes(long date, double lat, double lng, double height)
 {
     double lw = rad * -lng;
     double phi = rad * lat;
@@ -251,38 +228,77 @@ SolarTimes getTimes(long date, double lat, double lng, double height)
     double dec = declination(L, 0);
     double Jnoon = solarTransitJ(ds, M, L);
 
-    SolarTimes s;
-
-    s.solarNoon = fromJulian(Jnoon);
-    s.nadir = fromJulian(Jnoon - 0.5);
+    SolarTimeTuples tuples;
 
     RiseSetTime riseSet;
+    int iter;
+    SolarTimeTuple *stt;
+
+    iter = 0;
+
+    stt = &tuples.times[iter++];
+    strncpy(stt->name, "solar_noon", STT_NAME_MAX);
+    stt->time = fromJulian(Jnoon);
+
+    stt = &tuples.times[iter++];
+    strncpy(stt->name, "nadir", STT_NAME_MAX);
+    stt->time = fromJulian(Jnoon - 0.5);
 
     riseSet = getTimeForHorizonAngles(-0.833, Jnoon, lw, dh, phi, dec, n, M, L);
-    s.sunrise = riseSet.rise;
-    s.sunset = riseSet.set;
+    stt = &tuples.times[iter++];
+    strncpy(stt->name, "sunrise", STT_NAME_MAX);
+    stt->time = riseSet.rise;
+
+    stt = &tuples.times[iter++];
+    strncpy(stt->name, "sunset", STT_NAME_MAX);
+    stt->time = riseSet.set;
 
     riseSet = getTimeForHorizonAngles(-0.3, Jnoon, lw, dh, phi, dec, n, M, L);
-    s.sunriseEnd = riseSet.rise;
-    s.sunsetStart = riseSet.set;
+    stt = &tuples.times[iter++];
+    strncpy(stt->name, "sunrise_end", STT_NAME_MAX);
+    stt->time = riseSet.rise;
+
+    stt = &tuples.times[iter++];
+    strncpy(stt->name, "sunset_start", STT_NAME_MAX);
+    stt->time = riseSet.set;
 
     riseSet = getTimeForHorizonAngles(-6, Jnoon, lw, dh, phi, dec, n, M, L);
-    s.dawn = riseSet.rise;
-    s.dusk = riseSet.set;
+    stt = &tuples.times[iter++];
+    strncpy(stt->name, "dawn", STT_NAME_MAX);
+    stt->time = riseSet.rise;
+
+    stt = &tuples.times[iter++];
+    strncpy(stt->name, "dusk", STT_NAME_MAX);
+    stt->time = riseSet.set;
 
     riseSet = getTimeForHorizonAngles(-12, Jnoon, lw, dh, phi, dec, n, M, L);
-    s.nauticalDawn = riseSet.rise;
-    s.nauticalDusk = riseSet.set;
+    stt = &tuples.times[iter++];
+    strncpy(stt->name, "nautical_dawn", STT_NAME_MAX);
+    stt->time = riseSet.rise;
+
+    stt = &tuples.times[iter++];
+    strncpy(stt->name, "nautical_dusk", STT_NAME_MAX);
+    stt->time = riseSet.set;
 
     riseSet = getTimeForHorizonAngles(-18, Jnoon, lw, dh, phi, dec, n, M, L);
-    s.nightEnd = riseSet.rise;
-    s.night = riseSet.set;
+    stt = &tuples.times[iter++];
+    strncpy(stt->name, "night_end", STT_NAME_MAX);
+    stt->time = riseSet.rise;
+
+    stt = &tuples.times[iter++];
+    strncpy(stt->name, "night", STT_NAME_MAX);
+    stt->time = riseSet.set;
 
     riseSet = getTimeForHorizonAngles(6, Jnoon, lw, dh, phi, dec, n, M, L);
-    s.golendHourEnd = riseSet.rise;
-    s.goldenHour = riseSet.set;
+    stt = &tuples.times[iter++];
+    strncpy(stt->name, "golden_hour_end", STT_NAME_MAX);
+    stt->time = riseSet.rise;
 
-    return s;
+    stt = &tuples.times[iter++];
+    strncpy(stt->name, "golden_hour", STT_NAME_MAX);
+    stt->time = riseSet.set;
+
+    return tuples;
 }
 
 RiseSetTime getTimeForHorizonAngles(double angle, double JNoon, double lw, double dh, double phi, double dec, double n, double M, double L)
@@ -300,30 +316,6 @@ RiseSetTime getTimeForHorizonAngles(double angle, double JNoon, double lw, doubl
     return rst;
 }
 
-PG_FUNCTION_INFO_V1(getSunPositionAzimuth);
-
-Datum getSunPositionAzimuth(PG_FUNCTION_ARGS)
-{
-    float8 date = PG_GETARG_FLOAT8(0);
-    float8 lat = PG_GETARG_FLOAT8(1);
-    float8 lng = PG_GETARG_FLOAT8(2);
-    AzimuthAltitude az = getPosition(date, lat, lng);
-
-    PG_RETURN_FLOAT8(az.azimuth);
-}
-
-PG_FUNCTION_INFO_V1(getSunPositionAltitude);
-
-Datum getSunPositionAltitude(PG_FUNCTION_ARGS)
-{
-    float8 date = PG_GETARG_FLOAT8(0);
-    float8 lat = PG_GETARG_FLOAT8(1);
-    float8 lng = PG_GETARG_FLOAT8(2);
-    AzimuthAltitude az = getPosition(date, lat, lng);
-
-    PG_RETURN_FLOAT8(az.altitude);
-}
-
 PG_FUNCTION_INFO_V1(getSunPosition);
 
 Datum getSunPosition(PG_FUNCTION_ARGS)
@@ -334,7 +326,10 @@ Datum getSunPosition(PG_FUNCTION_ARGS)
     TupleDesc tupdesc;
     AttInMetadata *attinmeta;
 
-    printf("Foobar");
+    float8 date;
+    float8 lat;
+    float8 lng;
+    AzimuthAltitude az;
 
     /* stuff done only on the first call of the function */
     if (SRF_IS_FIRSTCALL())
@@ -364,6 +359,11 @@ Datum getSunPosition(PG_FUNCTION_ARGS)
         attinmeta = TupleDescGetAttInMetadata(tupdesc);
         funcctx->attinmeta = attinmeta;
 
+        date = PG_GETARG_FLOAT8(0);
+        lat = PG_GETARG_FLOAT8(1);
+        lng = PG_GETARG_FLOAT8(2);
+        az = getPosition(date, lat, lng);
+
         MemoryContextSwitchTo(oldcontext);
     }
 
@@ -380,11 +380,6 @@ Datum getSunPosition(PG_FUNCTION_ARGS)
         HeapTuple tuple;
         Datum result;
 
-        float8 date;
-        float8 lat;
-        float8 lng;
-        AzimuthAltitude az;
-
         /*
          * Prepare a values array for building the returned tuple.
          * This should be an array of C strings which will
@@ -393,12 +388,6 @@ Datum getSunPosition(PG_FUNCTION_ARGS)
         values = (char **)palloc(2 * sizeof(char *));
         values[0] = (char *)palloc(16 * sizeof(char));
         values[1] = (char *)palloc(16 * sizeof(char));
-
-        date= PG_GETARG_FLOAT8(0);
-        lat = PG_GETARG_FLOAT8(1);
-        lng = PG_GETARG_FLOAT8(2);
-        
-        az = getPosition(date, lat, lng);
 
         snprintf(values[0], 16, "%f", az.azimuth);
         snprintf(values[1], 16, "%f", az.altitude);
@@ -420,4 +409,49 @@ Datum getSunPosition(PG_FUNCTION_ARGS)
     {
         SRF_RETURN_DONE(funcctx);
     }
+}
+
+Datum getSunTimes(PG_FUNCTION_ARGS);
+PG_FUNCTION_INFO_V1(getSunTimes);
+
+Datum getSunTimes(PG_FUNCTION_ARGS)
+{
+    float8 date;
+    float8 lat;
+    float8 lng;
+    float8 height;
+    SolarTimeTuples tuples;
+    Datum values[2];
+
+    ReturnSetInfo *rsinfo = (ReturnSetInfo *)fcinfo->resultinfo;
+    rsinfo->returnMode = SFRM_Materialize;
+
+    MemoryContext per_query_ctx = rsinfo->econtext->ecxt_per_query_memory;
+    MemoryContext oldcontext = MemoryContextSwitchTo(per_query_ctx);
+
+    Tuplestorestate *tupstore = tuplestore_begin_heap(false, false, work_mem);
+    rsinfo->setResult = tupstore;
+
+    TupleDesc tupdesc = rsinfo->expectedDesc;
+    rsinfo->setDesc = rsinfo->expectedDesc;
+
+    uint32 times = STT_ITEMS;
+
+    date = PG_GETARG_FLOAT8(0);
+    lat = PG_GETARG_FLOAT8(1);
+    lng = PG_GETARG_FLOAT8(2);
+    height = PG_GETARG_FLOAT8(3);
+    tuples = getTimes(date, lat, lng, height);
+
+    while (times--)
+    {
+        values[0] = CStringGetTextDatum(tuples.times[times].name);
+        values[1] = Int32GetDatum(tuples.times[times].time);
+        bool nulls[sizeof(values)] = {0};
+        tuplestore_putvalues(tupstore, tupdesc, values, nulls);
+    }
+
+    tuplestore_donestoring(tupstore);
+    MemoryContextSwitchTo(oldcontext);
+    PG_RETURN_NULL();
 }
