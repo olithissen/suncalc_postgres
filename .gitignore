@@ -1,3 +1,4 @@
-suncalc/suncalc.o
-suncalc/suncalc.so
+*.o
+*.so
+*.bc
 suncalc/.vscode/settings.json
