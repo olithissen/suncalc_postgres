@@ -14,3 +14,4 @@ Work in progress.
 * `make install`
 * Run the commands in `suncalc.sql`
 * 🚀
+* Foo!
