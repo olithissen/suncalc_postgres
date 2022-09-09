@@ -1,24 +1,25 @@
 DROP FUNCTION IF EXISTS j1970;
 DROP FUNCTION IF EXISTS j2000;
 DROP FUNCTION IF EXISTS obliquity;
---drop function if exists tojulian;
-DROP FUNCTION IF EXISTS fromjulian;
-DROP FUNCTION IF EXISTS todays;
-DROP FUNCTION IF EXISTS rightascension;
+drop function if exists to_julian;
+DROP FUNCTION IF EXISTS from_julian;
+DROP FUNCTION IF EXISTS to_days;
+DROP FUNCTION IF EXISTS right_ascension;
 DROP FUNCTION IF EXISTS declination;
 DROP FUNCTION IF EXISTS azimuth;
 DROP FUNCTION IF EXISTS altitude;
-DROP FUNCTION IF EXISTS siderealtime;
-DROP FUNCTION IF EXISTS solarmeananomaly;
-DROP FUNCTION IF EXISTS eclipticlongitude;
+DROP FUNCTION IF EXISTS sidereal_time;
+DROP FUNCTION IF EXISTS solar_mean_anomaly;
+DROP FUNCTION IF EXISTS ecliptic_longitude;
 DROP FUNCTION IF EXISTS juliancycle;
-DROP FUNCTION IF EXISTS approxtransit;
-DROP FUNCTION IF EXISTS solartransitj;
-DROP FUNCTION IF EXISTS hourangle;
-DROP FUNCTION IF EXISTS observerangle;
-DROP FUNCTION IF EXISTS gettimeforhorizonangles;
-DROP FUNCTION IF EXISTS getsuntimes;
+DROP FUNCTION IF EXISTS approximate_transit;
+DROP FUNCTION IF EXISTS solar_transit_j;
+DROP FUNCTION IF EXISTS hour_angle;
+DROP FUNCTION IF EXISTS observer_angle;
+DROP FUNCTION IF EXISTS time_for_horizon_angles;
+DROP FUNCTION IF EXISTS get_sun_times;
 
+-- Constant for Julian day '1970-01-01 12:00:00 UTC' --> https://en.wikipedia.org/wiki/Julian_day
 CREATE OR REPLACE FUNCTION j1970() RETURNS int AS
 $$
 BEGIN
@@ -26,6 +27,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+-- Constant for Julian date '2020-01-01 12:00:00 UTC' --> https://en.wikipedia.org/wiki/Julian_day
 CREATE OR REPLACE FUNCTION j2000() RETURNS int AS
 $$
 BEGIN
@@ -33,6 +35,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+-- Constant for the obliquity of Earth or Earth's axial tilt --> https://en.wikipedia.org/wiki/Axial_tilt#Earth
 CREATE OR REPLACE FUNCTION obliquity() RETURNS double precision AS
 $$
 BEGIN
@@ -40,34 +43,39 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE OR REPLACE FUNCTION tojulian(ts double precision) RETURNS double precision AS
+-- Converts an epoch timestamp to Julian date
+CREATE OR REPLACE FUNCTION to_julian(ts double precision) RETURNS double precision AS
 $$
 BEGIN
     RETURN ts / 86400 - 0.5 + j1970();
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE OR REPLACE FUNCTION fromjulian(j double precision) RETURNS double precision AS
+-- Converts a Julian date to epoch timestamp
+CREATE OR REPLACE FUNCTION from_julian(j double precision) RETURNS double precision AS
 $$
 BEGIN
     RETURN (j + 0.5 - j1970()) * 86400;
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE OR REPLACE FUNCTION todays(ts double precision) RETURNS double precision AS
+-- Calculates the number of days since '2020-01-01 12:00:00 UTC'
+CREATE OR REPLACE FUNCTION to_days(ts double precision) RETURNS double precision AS
 $$
 BEGIN
-    RETURN tojulian(ts) - j2000();
+    RETURN to_julian(ts) - j2000();
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE OR REPLACE FUNCTION rightascension(longitude double precision, latitude double precision) RETURNS double precision AS
+-- Calculates the right ascension for a given longitude (|) and latitude (-) --> https://en.wikipedia.org/wiki/Right_ascension
+CREATE OR REPLACE FUNCTION right_ascension(longitude double precision, latitude double precision) RETURNS double precision AS
 $$
 BEGIN
     RETURN atan2(sin(longitude) * cos(obliquity()) - tan(latitude) * sin(obliquity()), cos(longitude));
 END;
 $$ LANGUAGE plpgsql;
 
+-- Calculates the declination for a given longitude (|) and latitude (-) --> https://en.wikipedia.org/wiki/Declination
 CREATE OR REPLACE FUNCTION declination(longitude double precision, latitude double precision) RETURNS double precision AS
 $$
 BEGIN
@@ -75,6 +83,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+-- Calculates the azimuth for given sideral time h, phi and declination --> https://en.wikipedia.org/wiki/Azimuth
 CREATE OR REPLACE FUNCTION azimuth(h double precision, phi double precision, decl double precision) RETURNS double precision AS
 $$
 BEGIN
@@ -82,6 +91,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+-- Calculates the altitude for given sideral time h, phi and declination --> https://en.wikipedia.org/wiki/Horizontal_coordinate_system
 CREATE OR REPLACE FUNCTION altitude(h double precision, phi double precision, decl double precision) RETURNS double precision AS
 $$
 BEGIN
@@ -89,48 +99,54 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE OR REPLACE FUNCTION siderealtime(d double precision, lw double precision) RETURNS double precision AS
+-- Calculates the sidereal time for given day and longitude --> https://en.wikipedia.org/wiki/Sidereal_time
+CREATE OR REPLACE FUNCTION sidereal_time(day double precision, longidtude_rad double precision) RETURNS double precision AS
 $$
 BEGIN
-    RETURN pi() / 180 * (280.16 + 360.9856235 * d) - lw;
+    RETURN pi() / 180 * (280.16 + 360.9856235 * day) - longidtude_rad;
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE OR REPLACE FUNCTION solarmeananomaly(d double precision) RETURNS double precision AS
+-- Calculates the solar mean anomaly for a given day --> https://en.wikipedia.org/wiki/Mean_anomaly
+CREATE OR REPLACE FUNCTION solar_mean_anomaly(day double precision) RETURNS double precision AS
 $$
 BEGIN
-    RETURN pi() / 180 * (357.5291 + 0.98560028 * d);
+    RETURN pi() / 180 * (357.5291 + 0.98560028 * day);
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE OR REPLACE FUNCTION eclipticlongitude(m double precision) RETURNS double precision AS
+-- Calculates the ecliptic longitude for a given mean anomaly --> https://en.wikipedia.org/wiki/Ecliptic_coordinate_system#Spherical_coordinates
+CREATE OR REPLACE FUNCTION ecliptic_longitude(mean_anomaly double precision) RETURNS double precision AS
 $$
 DECLARE
-    c double precision;
-    p double precision;
+    center     double precision;
+    perihelion double precision;
 BEGIN
-    c = pi() / 180 * (1.9148 * sin(m) + 0.02 * sin(2 * m) + 0.0003 * sin(3 * m)); -- equation of center
-    p = pi() / 180 * 102.9372; -- perihelion of the Earth
+    center = pi() / 180 * (1.9148 * sin(mean_anomaly) + 0.02 * sin(2 * mean_anomaly) +
+                           0.0003 * sin(3 * mean_anomaly)); -- equation of center
+    perihelion = pi() / 180 * 102.9372; -- perihelion of the Earth
 
-    RETURN m + c + p + pi();
+    RETURN mean_anomaly + center + perihelion + pi();
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE OR REPLACE FUNCTION juliancycle(d double precision, lw double precision) RETURNS double precision AS
+-- Calculates the julian cycle for given day and longitude
+CREATE OR REPLACE FUNCTION juliancycle(day double precision, longitude_rad double precision) RETURNS double precision AS
 $$
 BEGIN
-    RETURN round(d - 0.0009 - lw / (2 * pi()));
+    RETURN round(day - 0.0009 - longitude_rad / (2 * pi()));
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE OR REPLACE FUNCTION approxtransit(ht double precision, lw double precision, n double precision) RETURNS double precision AS
+-- Calculates the approximate transit for
+CREATE OR REPLACE FUNCTION approximate_transit(ht double precision, lw double precision, n double precision) RETURNS double precision AS
 $$
 BEGIN
     RETURN 0.0009 + (ht + lw) / (2 * pi()) + n;
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE OR REPLACE FUNCTION solartransitj(ds double precision, m double precision, l double precision) RETURNS double precision AS
+CREATE OR REPLACE FUNCTION solar_transit_j(ds double precision, m double precision, l double precision) RETURNS double precision AS
 $$
 BEGIN
     RETURN j2000() + ds + 0.0053 * sin(m) - 0.0069 * sin(2 * l);
@@ -139,38 +155,17 @@ $$ LANGUAGE plpgsql;
 
 ----------------------------------------------------------------------
 
-CREATE OR REPLACE FUNCTION hourangle(h double precision, phi double precision, d double precision) RETURNS double precision AS
+CREATE OR REPLACE FUNCTION hour_angle(h double precision, phi double precision, d double precision) RETURNS double precision AS
 $$
 DECLARE
     result double precision;
 BEGIN
-    RAISE INFO 'h % phi % d %', h, phi, d;
-
-    result = sin(h);
-    RAISE INFO 'sin(h) %', result;
-
-    result = sin(phi);
-    RAISE INFO 'sin(phi) %', result;
-
-    result = sin(d);
-    RAISE INFO 'sin(d) %', result;
-
-    result = cos(phi);
-    RAISE INFO 'cos(phi) %', result;
-
-    result = cos(d);
-    RAISE INFO 'cos(d) %', result;
-
-    result = (sin(h) - sin(phi) * sin(d)) / (cos(phi) * cos(d));
-    RAISE INFO 'result %', result;
-
     result = acos((sin(h) - sin(phi) * sin(d)) / (cos(phi) * cos(d)));
-    RAISE INFO 'result %', result;
     RETURN result;
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE OR REPLACE FUNCTION observerangle(height double precision) RETURNS double precision AS
+CREATE OR REPLACE FUNCTION observer_angle(height double precision) RETURNS double precision AS
 $$
 BEGIN
     RETURN (-2.076 * sqrt(height)) / 60.0;
@@ -178,45 +173,45 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- returns set time for the given sun altitude
-CREATE OR REPLACE FUNCTION getsetj(h double precision,
-                                   lw double precision,
-                                   phi double precision,
-                                   decl double precision,
-                                   n double precision,
-                                   m double precision,
-                                   l double precision) RETURNS double precision AS
+CREATE OR REPLACE FUNCTION get_set_j(h double precision,
+                                     lw double precision,
+                                     phi double precision,
+                                     decl double precision,
+                                     n double precision,
+                                     m double precision,
+                                     l double precision) RETURNS double precision AS
 $$
 DECLARE
     w double precision;
     a double precision;
 BEGIN
-    w = hourangle(h, phi, decl);
-    a = approxtransit(w, lw, n);
-    RETURN solartransitj(a, m, l);
+    w = hour_angle(h, phi, decl);
+    a = approximate_transit(w, lw, n);
+    RETURN solar_transit_j(a, m, l);
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE OR REPLACE FUNCTION suncoords(d double precision,
-                                     OUT decl double precision,
-                                     OUT ra double precision) RETURNS record AS
+CREATE OR REPLACE FUNCTION sun_coordinates(d double precision,
+                                           OUT decl double precision,
+                                           OUT ra double precision) RETURNS record AS
 $$
 DECLARE
     m double precision;
     l double precision;
 BEGIN
-    m = solarmeananomaly(d);
-    l = eclipticlongitude(m);
+    m = solar_mean_anomaly(d);
+    l = ecliptic_longitude(m);
 
     decl = declination(l, 0);
-    ra = rightascension(l, 0);
+    ra = right_ascension(l, 0);
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE OR REPLACE FUNCTION getsunposition(ts timestamp WITH TIME ZONE,
-                                          lat double precision,
-                                          lng double precision,
-                                          OUT azimuth double precision,
-                                          OUT altitude double precision) RETURNS record AS
+CREATE OR REPLACE FUNCTION get_sun_position(ts timestamp WITH TIME ZONE,
+                                            lat double precision,
+                                            lng double precision,
+                                            OUT azimuth double precision,
+                                            OUT altitude double precision) RETURNS record AS
 $$
 DECLARE
     date double precision;
@@ -231,17 +226,17 @@ BEGIN
 
     lw = pi() / 180 * -lng;
     phi = pi() / 180 * lat;
-    d = todays(date);
+    d = to_days(date);
 
-    SELECT * INTO decl, ra FROM suncoords(d);
-    h = siderealtime(d, lw) - ra;
+    SELECT * INTO decl, ra FROM sun_coordinates(d);
+    h = sidereal_time(d, lw) - ra;
 
     azimuth = azimuth(h, phi, decl);
     altitude = altitude(h, phi, decl);
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE OR REPLACE FUNCTION gettimeforhorizonangles(angle double precision,
+CREATE OR REPLACE FUNCTION time_for_horizon_angles(angle double precision,
                                                    jnoon double precision,
                                                    lw double precision,
                                                    dh double precision,
@@ -259,19 +254,19 @@ DECLARE
     jrise double precision;
 BEGIN
     h0 = (angle + dh) * pi() / 180;
-    jset = getsetj(h0, lw, phi, decl, n, m, l);
+    jset = get_set_j(h0, lw, phi, decl, n, m, l);
     RAISE INFO '%', jset;
     jrise = jnoon - (jset - jnoon);
 
-    risetime = fromjulian(jrise);
-    settime = fromjulian(jset);
+    risetime = from_julian(jrise);
+    settime = from_julian(jset);
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE OR REPLACE FUNCTION getsuntimes(ts timestamp WITH TIME ZONE,
-                                       lat double precision,
-                                       lng double precision,
-                                       height double precision)
+CREATE OR REPLACE FUNCTION get_sun_times(ts timestamp WITH TIME ZONE,
+                                         lat double precision,
+                                         lng double precision,
+                                         height double precision)
     RETURNS table
             (
                 event  varchar,
@@ -282,33 +277,33 @@ CREATE OR REPLACE FUNCTION getsuntimes(ts timestamp WITH TIME ZONE,
 AS
 $$
 DECLARE
-    date     double precision;
-    lw       double precision;
-    phi      double precision;
-    dh       double precision;
-    d        double precision;
-    n        double precision;
-    ds       double precision;
-    m        double precision;
-    l        double precision;
-    decl     double precision;
-    jnoon    double precision;
-    rec      RECORD;
-    risetime double precision;
-    settime  double precision;
+    date      double precision;
+    lw        double precision;
+    phi       double precision;
+    dh        double precision;
+    d         double precision;
+    n         double precision;
+    ds        double precision;
+    m         double precision;
+    l         double precision;
+    decl      double precision;
+    j_noon    double precision;
+    rec       RECORD;
+    rise_time double precision;
+    set_time  double precision;
 BEGIN
     date = extract('epoch' FROM ts)::double precision;
 
     lw = pi() / 180 * -lng;
     phi = pi() / 180 * lat;
-    dh = observerangle(height);
-    d = todays(date);
+    dh = observer_angle(height);
+    d = to_days(date);
     n = juliancycle(d, lw);
-    ds = approxtransit(0, lw, n);
-    m = solarmeananomaly(ds);
-    l = eclipticlongitude(m);
+    ds = approximate_transit(0, lw, n);
+    m = solar_mean_anomaly(ds);
+    l = ecliptic_longitude(m);
     decl = declination(l, 0);
-    jnoon = solartransitj(ds, m, l);
+    j_noon = solar_transit_j(ds, m, l);
 
     CREATE TEMP TABLE temp_solartimes
     (
@@ -326,30 +321,37 @@ BEGIN
            (6, 'goldenHourEnd', 'goldenHour');
 
     event := 'solarNoon';
-    time := to_timestamp(fromjulian(jnoon)) AT TIME ZONE 'UTC';
-    SELECT * INTO az, alt FROM getsunposition(time, lat, lng);
+    time := to_timestamp(from_julian(j_noon)) AT TIME ZONE 'UTC';
+    SELECT * INTO az, alt FROM get_sun_position(time, lat, lng);
     RETURN NEXT;
 
     event := 'nadir';
-    time := to_timestamp(fromjulian(jnoon - 0.5)) AT TIME ZONE 'UTC';
-    SELECT * INTO az, alt FROM getsunposition(time, lat, lng);
+    time := to_timestamp(from_julian(j_noon - 0.5)) AT TIME ZONE 'UTC';
+    SELECT * INTO az, alt FROM get_sun_position(time, lat, lng);
     RETURN NEXT;
 
     FOR rec IN SELECT angle, start, "end" FROM temp_solartimes
         LOOP
-            SELECT *
-            INTO risetime, settime
-            FROM gettimeforhorizonangles(rec.angle, jnoon, lw, dh, phi, decl, n, m, l) AS x;
+            BEGIN
+                SELECT *
+                INTO rise_time, set_time
+                FROM time_for_horizon_angles(rec.angle, j_noon, lw, dh, phi, decl, n, m, l) AS x;
+            EXCEPTION
+                WHEN OTHERS THEN
+                    RAISE INFO 'No valid values for % and %. That is totally fine and just how earth works :-)', rec.start, rec."end";
+                    rise_time = null;
+                    set_time = null;
+            END;
 
             event := rec.start;
-            time := to_timestamp(risetime) AT TIME ZONE 'UTC';
-            SELECT * INTO az, alt FROM getsunposition(time, lat, lng);
+            time := to_timestamp(rise_time) AT TIME ZONE 'UTC';
+            SELECT * INTO az, alt FROM get_sun_position(time, lat, lng);
 
             RETURN NEXT;
 
             event := rec."end";
-            time := to_timestamp(settime) AT TIME ZONE 'UTC';
-            SELECT * INTO az, alt FROM getsunposition(time, lat, lng);
+            time := to_timestamp(set_time) AT TIME ZONE 'UTC';
+            SELECT * INTO az, alt FROM get_sun_position(time, lat, lng);
             RETURN NEXT;
         END LOOP;
 
@@ -359,24 +361,39 @@ $$ LANGUAGE plpgsql;
 
 --
 
-SELECT todays(extract('epoch' FROM now())::bigint);
+SELECT to_days(extract('epoch' FROM now())::bigint);
 
-SELECT rightascension(51.0, 6.0);
+SELECT right_ascension(51.0, 6.0);
 SELECT declination(51.0, 6.0);
 
 SELECT *
-FROM suncoords(1.0);
+FROM sun_coordinates(1.0);
 
 SELECT degrees(azimuth), degrees(altitude), azimuth, altitude
-FROM getsunposition('2013-03-05 00:00:00 UTC', 50.5, 30.5);
+FROM get_sun_position('2013-03-05 00:00:00 UTC', 50.5, 30.5);
 
 SELECT degrees(azimuth), degrees(altitude), azimuth, altitude
-FROM getsunposition(now(), 51, 6);
+FROM get_sun_position(now(), 51, 6);
 
 
 SELECT event, "time" AT TIME ZONE 'Europe/Berlin'
-FROM getsuntimes('2013-03-05 00:00:00 UTC', 50.5, 30.5, 0.0);
+FROM get_sun_times('2013-03-05 00:00:00 UTC', 50.5, 30.5, 0.0);
 
 SELECT event, time AT TIME ZONE 'Europe/Berlin' "time", degrees(az) "azimuth", degrees(alt) "altitude"
-FROM getsuntimes('2022-05-27 00:00:00 CEST', 51, 6, 0.0)
+FROM get_sun_times('2022-05-27 00:00:00 CEST', 51, 6, 0.0)
 ORDER BY time;
+
+SELECT event, time AT TIME ZONE 'Europe/Berlin' "time", degrees(az) "azimuth", degrees(alt) "altitude"
+FROM get_sun_times('2022-09-09 00:00:00 CEST', 51, 6, 0.0)
+ORDER BY time;
+
+explain analyze verbose
+SELECT x.generate_series::date,
+       z.event,
+       z.time AT TIME ZONE 'Europe/Berlin' "time",
+       degrees(z.az),
+       degrees(z.alt)
+FROM (select * from generate_series('2022-01-01 12:00'::timestamp, '2022-12-31 12:00', '1 day')) x
+   , get_sun_times(x.generate_series, 51, 6, 0) z
+where z.event in ('sunrise', 'sunset', 'solarNoon')
+
