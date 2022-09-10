@@ -1,7 +1,7 @@
 DROP FUNCTION IF EXISTS j1970;
 DROP FUNCTION IF EXISTS j2000;
 DROP FUNCTION IF EXISTS obliquity;
-drop function if exists to_julian;
+DROP FUNCTION IF EXISTS to_julian;
 DROP FUNCTION IF EXISTS from_julian;
 DROP FUNCTION IF EXISTS to_days;
 DROP FUNCTION IF EXISTS right_ascension;
@@ -18,6 +18,17 @@ DROP FUNCTION IF EXISTS hour_angle;
 DROP FUNCTION IF EXISTS observer_angle;
 DROP FUNCTION IF EXISTS time_for_horizon_angles;
 DROP FUNCTION IF EXISTS get_sun_times;
+
+CREATE OR REPLACE FUNCTION fmod(
+    dividend double precision,
+    divisor double precision
+) RETURNS double precision
+    IMMUTABLE AS
+$$
+BEGIN
+    RETURN dividend - floor(dividend / divisor) * divisor;
+END;
+$$ LANGUAGE plpgsql;
 
 -- Constant for Julian day '1970-01-01 12:00:00 UTC' --> https://en.wikipedia.org/wiki/Julian_day
 CREATE OR REPLACE FUNCTION j1970() RETURNS int AS
@@ -47,7 +58,8 @@ $$ LANGUAGE plpgsql;
 CREATE OR REPLACE FUNCTION to_julian(ts double precision) RETURNS double precision AS
 $$
 BEGIN
-    RETURN ts / 86400 - 0.5 + j1970();
+    -- RETURN ts / 86400 - 0.5 + j1970();
+    RETURN ts / 86400 - 0.5 + 2440588;
 END;
 $$ LANGUAGE plpgsql;
 
@@ -55,7 +67,8 @@ $$ LANGUAGE plpgsql;
 CREATE OR REPLACE FUNCTION from_julian(j double precision) RETURNS double precision AS
 $$
 BEGIN
-    RETURN (j + 0.5 - j1970()) * 86400;
+    -- RETURN (j + 0.5 - j1970()) * 86400;
+    RETURN (j + 0.5 - 2440588) * 86400;
 END;
 $$ LANGUAGE plpgsql;
 
@@ -63,7 +76,8 @@ $$ LANGUAGE plpgsql;
 CREATE OR REPLACE FUNCTION to_days(ts double precision) RETURNS double precision AS
 $$
 BEGIN
-    RETURN to_julian(ts) - j2000();
+    -- RETURN to_julian(ts) - j2000();
+    RETURN to_julian(ts) - 2451545;
 END;
 $$ LANGUAGE plpgsql;
 
@@ -149,7 +163,8 @@ $$ LANGUAGE plpgsql;
 CREATE OR REPLACE FUNCTION solar_transit_j(ds double precision, m double precision, l double precision) RETURNS double precision AS
 $$
 BEGIN
-    RETURN j2000() + ds + 0.0053 * sin(m) - 0.0069 * sin(2 * l);
+    -- RETURN j2000() + ds + 0.0053 * sin(m) - 0.0069 * sin(2 * l);
+    RETURN 2451545 + ds + 0.0053 * sin(m) - 0.0069 * sin(2 * l);
 END;
 $$ LANGUAGE plpgsql;
 
@@ -255,7 +270,6 @@ DECLARE
 BEGIN
     h0 = (angle + dh) * pi() / 180;
     jset = get_set_j(h0, lw, phi, decl, n, m, l);
-    RAISE INFO '%', jset;
     jrise = jnoon - (jset - jnoon);
 
     risetime = from_julian(jrise);
@@ -337,10 +351,9 @@ BEGIN
                 INTO rise_time, set_time
                 FROM time_for_horizon_angles(rec.angle, j_noon, lw, dh, phi, decl, n, m, l) AS x;
             EXCEPTION
-                WHEN OTHERS THEN
-                    RAISE INFO 'No valid values for % and %. That is totally fine and just how earth works :-)', rec.start, rec."end";
-                    rise_time = null;
-                    set_time = null;
+                WHEN OTHERS THEN RAISE INFO 'No valid values for % and %. That is totally fine and just how earth works :-)', rec.start, rec."end";
+                rise_time = NULL;
+                set_time = NULL;
             END;
 
             event := rec.start;
@@ -358,42 +371,17 @@ BEGIN
     DROP TABLE temp_solartimes;
 END ;
 $$ LANGUAGE plpgsql;
-
 --
 
-SELECT to_days(extract('epoch' FROM now())::bigint);
-
-SELECT right_ascension(51.0, 6.0);
-SELECT declination(51.0, 6.0);
-
-SELECT *
-FROM sun_coordinates(1.0);
-
-SELECT degrees(azimuth), degrees(altitude), azimuth, altitude
-FROM get_sun_position('2013-03-05 00:00:00 UTC', 50.5, 30.5);
-
-SELECT degrees(azimuth), degrees(altitude), azimuth, altitude
-FROM get_sun_position(now(), 51, 6);
-
-
-SELECT event, "time" AT TIME ZONE 'Europe/Berlin'
-FROM get_sun_times('2013-03-05 00:00:00 UTC', 50.5, 30.5, 0.0);
-
-SELECT event, time AT TIME ZONE 'Europe/Berlin' "time", degrees(az) "azimuth", degrees(alt) "altitude"
-FROM get_sun_times('2022-05-27 00:00:00 CEST', 51, 6, 0.0)
-ORDER BY time;
-
-SELECT event, time AT TIME ZONE 'Europe/Berlin' "time", degrees(az) "azimuth", degrees(alt) "altitude"
-FROM get_sun_times('2022-09-09 00:00:00 CEST', 51, 6, 0.0)
-ORDER BY time;
-
-explain analyze verbose
-SELECT x.generate_series::date,
-       z.event,
-       z.time AT TIME ZONE 'Europe/Berlin' "time",
-       degrees(z.az),
-       degrees(z.alt)
-FROM (select * from generate_series('2022-01-01 12:00'::timestamp, '2022-12-31 12:00', '1 day')) x
+EXPLAIN ANALYZE VERBOSE
+SELECT x.generate_series::date             AS "date",
+       z.event                             AS "event",
+       z.time AT TIME ZONE 'Europe/Berlin' AS "time",
+       fmod(degrees(z.az) - 180, 360)      AS "azimuth",
+       degrees(z.az)                       AS "azimuth_rel_s",
+       degrees(z.alt)                      AS "altitude"
+FROM (SELECT * FROM generate_series('2022-01-01 12:00'::timestamp, '2022-12-31 12:00', '1 day')) x
    , get_sun_times(x.generate_series, 51, 6, 0) z
-where z.event in ('sunrise', 'sunset', 'solarNoon')
+WHERE z.event IN ('sunrise', 'sunset', 'solarNoon')
+ORDER BY z.time
 
