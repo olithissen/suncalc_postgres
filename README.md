@@ -1,6 +1,6 @@
 # SunCalc for PostgreSQL
 
-This is a pure PL/pgSQL port of [Volodymyr Agafonkin's 🇺🇦 fantastic SunCalc library](https://github.com/mourner/suncalc).
+This is a pure PL/pgSQL port of [Volodymyr Agafonkin's fantastic SunCalc library](https://github.com/mourner/suncalc).
 It has been tested with the official PostgreSQL Docker images for versions 9 and above.
 
 ## Quick start
