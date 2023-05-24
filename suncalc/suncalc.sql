@@ -313,14 +313,15 @@ BEGIN
                             (-6, 'dawn', 'dusk'),
                             (-12, 'nauticalDawn', 'nauticalDusk'),
                             (-18, 'nightEnd', 'night'),
-                            (6, 'goldenHourEnd', 'goldenHour')) x(angle, start, "end")
+                            (6, 'goldenHourEnd', 'goldenHour')) times(angle, start, "end")
         LOOP
             BEGIN
                 SELECT risetime, settime
                 INTO rise_time, set_time
                 FROM sc_time_for_horizon_angles(rec.angle, j_noon, lw, dh, phi, decl, n, m, l) AS x;
             EXCEPTION
-                WHEN OTHERS THEN RAISE INFO 'No valid values for % and %. That is totally fine and just how earth works :-)', rec.start, rec."end";
+                WHEN OTHERS THEN
+                    --RAISE INFO 'No valid values for % and %. That is totally fine and just how earth works :-)', rec.start, rec."end";
                 rise_time = NULL;
                 set_time = NULL;
             END;
@@ -336,13 +337,3 @@ BEGIN
         END LOOP;
 END ;
 $$ LANGUAGE plpgsql IMMUTABLE;
---
-
-SELECT event, x.time AT TIME ZONE 'Europe/Berlin', azimuth, degrees(azimuth), altitude, degrees(altitude)
-FROM get_sun_times(current_date, 51, 6, 60) x,
-     get_sun_position(x.time, 51, 6) y;
-
-EXPLAIN ANALYSE
-SELECT event, x.time AT TIME ZONE 'Europe/Berlin'
-FROM get_sun_times(TO_TIMESTAMP('2023-06-10', 'YYYY-MM-DD'), 51, 6, 60) x
-ORDER BY 1;

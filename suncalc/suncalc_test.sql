@@ -1,2 +1,0 @@
-CREATE EXTENSION suncalc;
-SELECT * FROM sun_position(1645198134, 51, 0);
