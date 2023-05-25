@@ -6,16 +6,16 @@ It has been tested with the official PostgreSQL Docker images for versions 9 and
 ## Quick start
 
 - Connect to your PostgreSQL server with your database client of choice
-    - Run the contents of `suncalc/suncalc.sql`
-    - Check out the main functions
-        - Find out when you can see the sunset during your visit to the restaurant platform of Berlin's TV Tower on 25th
+- Run the contents of `suncalc/suncalc.sql`
+- Check out the main functions
+   - Find out when you can see the sunset during your visit to the restaurant platform of Berlin's TV Tower on 25th
           of May 2023
           ```postgresql
           SELECT event, time AT TIME ZONE 'Europe/Berlin'
           FROM get_sun_times(TIMESTAMP '2023-05-25', 52.5206828, 13.409282, 239)
           WHERE event = 'sunset';
           ```
-        - Find out how to position your parasol while going to the beach in the Netherlands a week after
+    - Find out how to position your parasol while going to the beach in the Netherlands a week after
           ```postgresql
           SELECT degrees(azimuth), degrees(altitude)
           FROM get_sun_position(TIMESTAMP '2023-06-01 15:23:54' AT TIME ZONE 'Europe/Amsterdam', 51.3794803,3.3887999);      
