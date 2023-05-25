@@ -91,7 +91,9 @@ These do the heavy lifting regarding astronomy, time and trigonometry.
 - **sc_time_for_horizon_angles**: Calculates the sunrise and sunset times for a given horizon angle and other
   parameters.
 
-## Testing
+## Development
+
+### Testing
 
 The directory `test` contains scripts to generate test data and run the main functions against it.
 
@@ -105,3 +107,30 @@ And they actually do within quite narrow tolarances:
 - 0.000002 radians (~0.0001146 degrees) for azimuth
 
 Feel free to optimize the functions for precision and performance!
+
+### Todos
+
+#### Build and test infrastructure
+
+Next steps should be to provide a GitHub Action to test each commit against an actual PostgreSQL instance.
+
+#### Register with CREATE EXTENSION
+
+First a bit of history:
+The first try to port suncalc.js to PostgreSQL was an actual extension written in C.
+PostgreSQL comes with a build-system to create real extensions but it comes with a couple of tradeoffs.
+
+**pro**
+- Extensions can hide away the ugly internals and expose only the user methods
+- Extensions come with install-, uninstall- and test-scripts
+
+**con**
+- The build-system's documentation is spotty at best and there are not many examples around
+- The build-sytem heavily favors C
+- To install an extension you need filesystem access to the database server or you have to build your own container image
+- At least to me there is no known "drag & drop" solution to run a single SQL script and have a working extension afterwards
+
+The current solution can be used in all scenarios where you are allowed to run `CREATE FUNCTION`
+
+I haven't yet given up on the goal to provide something you can actually register with `CREATE EXTENSION` but it's my my area of expertise.
+Can **you** help?
