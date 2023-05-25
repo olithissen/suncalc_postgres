@@ -2,7 +2,7 @@ This is a pure PL/pgSQL port of [Volodymyr Agafonkin's fantastic SunCalc library
 
 # SunCalc for PostgreSQL
 
-**SunCalc for PostgreSQL** provides a set of functions to calculate the time of solar events like sunrise, noon for a specified time and location as well as the position of the sun in the sky for arbitrary times and locations.
+**SunCalc for PostgreSQL** provides a set of functions to calculate the time of solar events like sunrise, noon and more for a specified time and location as well as the position of the sun in the sky for arbitrary times and locations.
 It has been successfully tested with the official PostgreSQL Docker images from versions 9 to 15 and such also works with other flavors of PostgreSQL like [TimescaleDB](https://github.com/timescale/timescaledb)
 
 ## Quick start
