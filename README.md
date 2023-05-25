@@ -49,6 +49,11 @@ In general the two main functions accept respectively return
 - **nauticalDusk**: The time when the sky starts to become dark after sunset.
 - **night**: The time when the sky is fully dark.
 
+Keep in mind that depending on time and location some or even most of the events can yield `null` as time.
+This is not an error and just how Sun and Earth work:
+If you're within the polar circle there won't be a sunrise or sunset for half of the year.
+Even if you're in Central Europe there is no actual *night* in the weeks around the summer solstice, just nautical twilight.
+
 ### Get the sun's position in the sky
 
 `get_sun_position`: Calculates the azimuth and altitude of the sun for a given timestamp, latitude, and longitude.
