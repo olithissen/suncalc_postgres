@@ -24,6 +24,8 @@ It has been successfully tested with the official PostgreSQL Docker images from 
 
 ## Where to go from here?
 
+
+
 ### Get solar events for a specific day 
 `get_sun_times` calculates timestamps of all solar events for a given timestamp (positioning into a specific day), latitude, longitude, and observer's height.
 
@@ -41,6 +43,8 @@ It has been successfully tested with the official PostgreSQL Docker images from 
 - **dusk**: The time when the sky starts to darken after sunset.
 - **nauticalDusk**: The time when the sky starts to become dark after sunset.
 - **night**: The time when the sky is fully dark.
+
+### Get the sun's position in the sky
 
 `get_sun_position`: Calculates the azimuth and altitude of the sun for a given timestamp, latitude, and longitude.
 
