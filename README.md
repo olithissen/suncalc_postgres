@@ -24,7 +24,12 @@ It has been successfully tested with the official PostgreSQL Docker images from 
 
 ## Where to go from here?
 
+In general the two main functions accept respectively return
 
+- times in form of as `::timestamp with timezone`
+- latitude and longitude in ±decimal degrees as `::double precision`
+- height in meters as `::double precision`
+- angles in radians as `::double precision` 
 
 ### Get solar events for a specific day 
 `get_sun_times` calculates timestamps of all solar events for a given timestamp (positioning into a specific day), latitude, longitude, and observer's height.
@@ -47,10 +52,12 @@ It has been successfully tested with the official PostgreSQL Docker images from 
 ### Get the sun's position in the sky
 
 `get_sun_position`: Calculates the azimuth and altitude of the sun for a given timestamp, latitude, and longitude.
+Both values are returned in **radians** and can be converted to degrees using PostgreSQL's built in `degrees()` function.
 
-- **azimuth** is the direction of the sun given as an offset from south.
+- **altitude** is the angle of the sun above the horizon with `0 <= altitude <= pi()/2` or `0° <= degrees(altitude) <= 90°`
+- **azimuth** is the direction of the sun given as an offset from south with `-pi() <= azimuth <= pi()` or `-180° < degrees(azimuth) < 180°`.
     This means that a value of *0.0* is south, negative values move north via east, positive values move north via west.
-- **altitude** is the angle of the sun above the horizon
+    To calculate a more human-readable angle in degrees relative to north you can use `180 + degrees(azimuth)`.
 
 ## The internals
 
