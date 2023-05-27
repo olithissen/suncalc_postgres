@@ -1,3 +1,5 @@
+[![Regression Tests](https://github.com/olithissen/suncalc_postgres/actions/workflows/test.yaml/badge.svg)](https://github.com/olithissen/suncalc_postgres/actions/workflows/test.yaml)
+
 This is a pure PL/pgSQL port of [Volodymyr Agafonkin's fantastic SunCalc library](https://github.com/mourner/suncalc).
 
 # SunCalc for PostgreSQL
