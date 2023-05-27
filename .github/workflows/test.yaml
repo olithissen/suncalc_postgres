@@ -32,10 +32,10 @@ jobs:
           sudo apt-get update
           sudo apt-get install --yes postgresql-client
       - name: Load test data
-        run: psql -h localhost -d postgres_db -U postgres -f test/create_test_events.sql -f test/create_test_positions.sql
+        run: psql -h localhost -d postgres -U postgres -f test/create_test_events.sql -f test/create_test_positions.sql
         env:
           PGPASSWORD: postgres
       - name: Run tests
-        run: psql -h localhost -d postgres_db -U postgres -f test/test.sql
+        run: psql -h localhost -d postgres -U postgres -f test/test.sql
         env:
           PGPASSWORD: postgres
