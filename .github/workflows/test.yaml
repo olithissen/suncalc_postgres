@@ -30,4 +30,4 @@ jobs:
       - name: 📦️ Load test data
         env:
           PGPASSWORD: postgres
-        run: docker run postgres:latest psql -h postgres -U postgres -d postgres -c "select 1 as result";
+        run: docker run postgres:latest psql -h localhost -U postgres -d postgres -c "select 1 as result";
