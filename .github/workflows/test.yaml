@@ -27,7 +27,11 @@ jobs:
     steps:
       - name: Check out repository code
         uses: actions/checkout@v3
-      - name: 📦️ Load test data
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes postgresql-client
+      - name: Test database connection
+        run: psql -h localhost -d postgres_db -U postgres_user -c 'SELECT 1;'
         env:
           PGPASSWORD: postgres
-        run: docker run postgres:latest psql -h localhost -U postgres -d postgres -c "select 1 as result";
