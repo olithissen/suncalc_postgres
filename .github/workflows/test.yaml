@@ -31,6 +31,10 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install --yes postgresql-client
+      - name: Install suncalc_postgres
+        run: psql -h localhost -d postgres -U postgres -f test/create_test_events.sql -f suncalc/suncalc.sql
+        env:
+          PGPASSWORD: postgres
       - name: Load test data
         run: psql -h localhost -d postgres -U postgres -f test/create_test_events.sql -f test/create_test_positions.sql
         env:
