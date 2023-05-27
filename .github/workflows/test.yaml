@@ -25,7 +25,7 @@ jobs:
         ports:
           - 5432:5432
     steps:
-      - name: Build docker images
+      - name: 📦️ Load test data
         env:
           PGPASSWORD: postgres
-        run: docker run postgres:latest psql -U postgres -d postgres -c "select 1 as result";
+        run: docker run postgres:latest psql -h postgres -U postgres -d postgres -c "select 1 as result";
